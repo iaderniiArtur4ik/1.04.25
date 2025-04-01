@@ -1,146 +1,146 @@
-import pandas as pd
-import os
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional
 
 
-class PasswordManager:
-    _instances = {}
+class ICharacterBuilder(ABC):
+    @abstractmethod
+    def set_name(self, name: str) -> 'ICharacterBuilder':
+        pass
 
-    def __new__(cls, account):
-        if account not in cls._instances:
-            cls._instances[account] = super(PasswordManager, cls).__new__(cls)
-            cls._instances[account]._initialized = False
-        return cls._instances[account]
+    @abstractmethod
+    def set_race(self, race: str) -> 'ICharacterBuilder':
+        pass
 
-    def __init__(self, account):
-        if not self._initialized:
-            self.account = account
-            self.password = self._load_password()
-            self._initialized = True
+    @abstractmethod
+    def set_class(self, char_class: str) -> 'ICharacterBuilder':
+        pass
 
-    def _load_password(self):
-        if not os.path.exists('passwords.xlsx'):
-            return None
+    @abstractmethod
+    def set_weapon(self, weapon: str) -> 'ICharacterBuilder':
+        pass
 
-        try:
-            df = pd.read_excel('passwords.xlsx')
-            account_row = df[df['Account'] == self.account]
-            if not account_row.empty:
-                return account_row['Password'].values[0]
-            return None
-        except Exception as e:
-            print(f"Ошибка при загрузке пароля: {e}")
-            return None
+    @abstractmethod
+    def set_magic(self, magic: str) -> 'ICharacterBuilder':
+        pass
 
-    def set_password(self, password):
-        self.password = password
-        self._save_password()
-        print(f"\nПароль для аккаунта '{self.account}' успешно сохранён!")
+    @abstractmethod
+    def build(self) -> Dict[str, str]:
+        pass
 
-    def get_password(self):
-        return self.password
+class Character:
+    def __init__(self):
+        self._attributes: Dict[str, Optional[str]] = {
+            'name': None,
+            'race': None,
+            'class': None,
+            'weapon': None,
+            'magic': None
+        }
 
-    def _save_password(self):
-        data = {'Account': [], 'Password': []}
+    def set_attribute(self, key: str, value: str) -> None:
+        self._attributes[key] = value
 
-        if os.path.exists('passwords.xlsx'):
-            try:
-                existing_df = pd.read_excel('passwords.xlsx')
-                data['Account'] = existing_df['Account'].tolist()
-                data['Password'] = existing_df['Password'].tolist()
-            except Exception as e:
-                print(f"Ошибка при чтении файла: {e}")
+    def get_attributes(self) -> Dict[str, Optional[str]]:
+        return self._attributes
 
-        if self.account in data['Account']:
-            index = data['Account'].index(self.account)
-            data['Password'][index] = self.password
+
+class CharacterValidator:
+    @staticmethod
+    def validate_race(race: str, valid_races: List[str]) -> bool:
+        return race.lower() in valid_races
+
+    @staticmethod
+    def validate_class(char_class: str, valid_classes: List[str]) -> bool:
+        return char_class.lower() in valid_classes
+
+    @staticmethod
+    def validate_not_empty(value: str) -> bool:
+        return bool(value.strip())
+
+
+class CharacterBuilder(ICharacterBuilder):
+    def __init__(self):
+        self._character = Character()
+        self._validator = CharacterValidator()
+        self._valid_races = ['человек', 'эльф', 'гном', 'орк', 'дварф']
+        self._valid_classes = ['воин', 'маг', 'лучник', 'жрец', 'разбойник']
+
+    def set_name(self, name: str) -> 'CharacterBuilder':
+        if self._validator.validate_not_empty(name):
+            self._character.set_attribute('name', name)
         else:
-            data['Account'].append(self.account)
-            data['Password'].append(self.password)
+            raise ValueError("Имя не может быть пустым")
+        return self
 
-        df = pd.DataFrame(data)
+    def set_race(self, race: str) -> 'CharacterBuilder':
+        if self._validator.validate_race(race, self._valid_races):
+            self._character.set_attribute('race', race.lower())
+        else:
+            raise ValueError(f"Недопустимая раса. Допустимые расы: {', '.join(self._valid_races)}")
+        return self
+
+    def set_class(self, char_class: str) -> 'CharacterBuilder':
+        if self._validator.validate_class(char_class, self._valid_classes):
+            self._character.set_attribute('class', char_class.lower())
+        else:
+            raise ValueError(f"Недопустимый класс. Допустимые классы: {', '.join(self._valid_classes)}")
+        return self
+
+    def set_weapon(self, weapon: str) -> 'CharacterBuilder':
+        if self._validator.validate_not_empty(weapon):
+            self._character.set_attribute('weapon', weapon)
+        else:
+            raise ValueError("Оружие не может быть пустым")
+        return self
+
+    def set_magic(self, magic: str) -> 'CharacterBuilder':
+        self._character.set_attribute('magic', magic)
+        return self
+
+    def build(self) -> Dict[str, Optional[str]]:
+        attributes = self._character.get_attributes()
+        if not all([attributes['name'], attributes['race'], attributes['class']]):
+            raise ValueError("Не заполнены обязательные поля: имя, раса и класс")
+        return attributes
+
+
+class ICharacterDisplayer(ABC):
+    @abstractmethod
+    def display(self, character: Dict[str, Optional[str]]) -> None:
+        pass
+
+
+class ConsoleCharacterDisplayer(ICharacterDisplayer):
+    def display(self, character: Dict[str, Optional[str]]) -> None:
+        print("\nСоздан персонаж:")
+        for key, value in character.items():
+            print(f"{key}: {value}")
+
+
+class CharacterDirector:
+    @staticmethod
+    def create_character(builder: ICharacterBuilder, displayer: ICharacterDisplayer) -> Dict[str, Optional[str]]:
         try:
-            df.to_excel('passwords.xlsx', index=False)
-        except Exception as e:
-            print(f"Ошибка при сохранении пароля: {e}")
-
-    @classmethod
-    def get_all_accounts(cls):
-        if not os.path.exists('passwords.xlsx'):
-            return []
-
-        try:
-            df = pd.read_excel('passwords.xlsx')
-            return df['Account'].tolist()
-        except Exception as e:
-            print(f"Ошибка при чтении списка аккаунтов: {e}")
-            return []
-
-
-def display_menu():
-    print("\n" + "=" * 40)
-    print("МЕНЕДЖЕР ПАРОЛЕЙ".center(40))
-    print("=" * 40)
-    print("1. Посмотреть все аккаунты")
-    print("2. Добавить/изменить пароль")
-    print("3. Посмотреть пароль")
-    print("4. Выход")
-    print("=" * 40)
+            character = (builder
+                         .set_name(input("Введите имя персонажа: "))
+                         .set_race(input("Введите расу персонажа: "))
+                         .set_class(input("Введите класс персонажа: "))
+                         .set_weapon(input("Введите оружие персонажа: "))
+                         .set_magic(input("Введите магию персонажа (или оставьте пустым): "))
+                         .build())
+            displayer.display(character)
+            return character
+        except ValueError as e:
+            print(f"Ошибка: {e}")
+            return {}
 
 
 def main():
-    while True:
-        display_menu()
-        choice = input("Выберите действие (1-4): ")
-
-        if choice == "1":
-            accounts = PasswordManager.get_all_accounts()
-            if accounts:
-                print("\nСписок аккаунтов:")
-                for i, account in enumerate(accounts, 1):
-                    print(f"{i}. {account}")
-            else:
-                print("\nАккаунты не найдены.")
-
-        elif choice == "2":
-            account = input("\nВведите имя аккаунта: ").strip()
-            if not account:
-                print("Имя аккаунта не может быть пустым!")
-                continue
-
-            password = input("Введите пароль: ").strip()
-            if not password:
-                print("Пароль не может быть пустым!")
-                continue
-
-            pm = PasswordManager(account)
-            pm.set_password(password)
-
-        elif choice == "3":
-            account = input("\nВведите имя аккаунта: ").strip()
-            if not account:
-                print("Имя аккаунта не может быть пустым!")
-                continue
-
-            pm = PasswordManager(account)
-            password = pm.get_password()
-
-            if password:
-                print(f"\nПароль для аккаунта '{account}': {password}")
-            else:
-                print(f"\nПароль для аккаунта '{account}' не найден.")
-
-        elif choice == "4":
-            print("\nРабота программы завершена.")
-            break
-
-        else:
-            print("\nНеверный выбор. Пожалуйста, введите число от 1 до 4.")
-
-        input("\nНажмите Enter чтобы продолжить...")
+    print("=== Создание персонажа ===")
+    builder = CharacterBuilder()
+    displayer = ConsoleCharacterDisplayer()
+    CharacterDirector.create_character(builder, displayer)
 
 
 if __name__ == "__main__":
-    if not os.path.exists('passwords.xlsx'):
-        pd.DataFrame(columns=['Account', 'Password']).to_excel('passwords.xlsx', index=False)
-
     main()
