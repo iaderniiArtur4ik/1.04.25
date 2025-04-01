@@ -62,7 +62,7 @@ class CharacterBuilder(ICharacterBuilder):
     def __init__(self):
         self._character = Character()
         self._validator = CharacterValidator()
-        self._valid_races = ['человек', 'эльф', 'гном', 'орк', 'дварф']
+        self._valid_races = ['абаюдненько', 'тайота самри', 'ня аригато', 'ня тютюпи ся ', 'ты🫵']
         self._valid_classes = ['воин', 'маг', 'лучник', 'жрец', 'разбойник']
 
     def set_name(self, name: str) -> 'CharacterBuilder':
